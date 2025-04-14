@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Sistema de Ventas Completo</title>
+<style>
+body {
+font-family: 'Arial', sans-serif;
+padding: 20px;
+max-width: 1200px;
+margin: 0 auto;
+background-color: #f8f9fa;
+}
+
+.totales {
+background: #ffffff;
+padding: 20px;
+margin-bottom: 20px;
+border-radius: 10px;
+box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+display: flex;
+justify-content: space-around;
+gap: 15px;
+}
+
+.formulario {
+background: #ffffff;
+padding: 20px;
+margin-bottom: 20px;
+border-radius: 10px;
+box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+display: grid;
+grid-template-columns: repeat(4, 1fr) 100px;
+gap: 10px;
+}
+
+.inventario {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+gap: 20px;
+}
+
+.item {
+background: #ffffff;
+border: 1px solid #e0e3e9;
+padding: 15px;
+border-radius: 10px;
+box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+input, button {
+padding: 8px;
+border: 1px solid #ddd;
+border-radius: 4px;
+}
+
+button {
+color: white;
+border: none;
+cursor: pointer;
+transition: 0.3s;
+}
+
+.btn-agregar { background: #3498db; }
+.btn-vender { background: #2ecc71; }
+.btn-eliminar { background: #e74c3c; }
+
+.buscar {
+width: 100%;
+margin: 20px 0;
+padding: 10px;
+}
+
+.historial {
+margin-top: 30px;
+background: white;
+padding: 20px;
+border-radius: 10px;
+box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+table {
+width: 100%;
+border-collapse: collapse;
+margin-top: 10px;
+}
+
+th, td {
+padding: 12px;
+text-align: left;
+border-bottom: 1px solid #ddd;
+}
+
+th { background-color: #f8f9fa; }
+
+.backup-section {
+margin-top: 20px;
+text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="totales">
+<div>
+<h3>Invertido</h3>
+<p>$<span id="invertido">0</span></p>
+</div>
+<div>
+<h3>Ganancia</h3>
+<p>$<span id="ganancia">0</span></p>
+</div>
+<div>
+<h3>Total General</h3>
+<p>$<span id="total">0</span></p>
+</div>
+</div>
+
+<div class="formulario">
+<input type="text" id="nombre" placeholder="Artículo">
+<input type="number" id="costo" placeholder="Costo">
+<input type="number" id="precio" placeholder="Precio">
+<input type="date" id="fecha">
+<button class="btn-agregar" onclick="agregarItem()">Agregar</button>
+</div>
+
+<input type="text" class="buscar" placeholder="Buscar artículo..." onkeyup="buscarItem(this.value)">
+
+<div class="inventario" id="inventario"></div>
+
+<div class="historial">
+<h2>Historial de Ventas</h2>
+<table id="historialVentas">
+<thead>
+<tr>
+<th>Fecha Venta</th>
+<th>Artículo</th>
+<th>Costo</th>
+<th>Precio</th>
+<th>Ganancia</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<div class="backup-section">
+<button class="btn-agregar" onclick="guardarBackup()">Guardar Backup</button>
+<label for="cargarBackup" style="background:#3498db; padding:8px 15px; border-radius:4px; cursor:pointer;">
+Cargar Backup
+</label>
+<input type="file" id="cargarBackup" onchange="cargarBackup(this)">
+</div>
+
+<script>
+let items = JSON.parse(localStorage.getItem('items')) || [];
+let vendidos = JSON.parse(localStorage.getItem('vendidos')) || [];
+
+function actualizarTotales() {
+const todosItems = [...items, ...vendidos];
+const invertido = todosItems.reduce((acc, item) => acc + Number(item.costo), 0);
+const ganancia = vendidos.reduce((acc, item) => acc + (Number(item.precio) - Number(item.costo)), 0);
+const total = invertido + ganancia;
+
+document.getElementById('invertido').textContent = invertido.toFixed(2);
+document.getElementById('ganancia').textContent = ganancia.toFixed(2);
+document.getElementById('total').textContent = total.toFixed(2);
+
+localStorage.setItem('items', JSON.stringify(items));
+localStorage.setItem('vendidos', JSON.stringify(vendidos));
+renderizarHistorial();
+}
+
+function agregarItem() {
+const item = {
+id: Date.now(),
+nombre: document.getElementById('nombre').value,
+costo: document.getElementById('costo').value,
+precio: document.getElementById('precio').value,
+fecha: document.getElementById('fecha').value
+};
+
+if (!item.nombre || !item.costo || !item.precio || !item.fecha) {
+alert('Complete todos los campos');
+return;
+}
+
+items.push(item);
+renderizarItems();
+actualizarTotales();
+
+document.getElementById('nombre').value = '';
+document.getElementById('costo').value = '';
+document.getElementById('precio').value = '';
+document.getElementById('fecha').value = '';
+}
+
+function venderItem(id) {
+const index = items.findIndex(item => item.id === id);
+vendidos.push({...items[index], fechaVenta: new Date().toISOString()});
+items.splice(index, 1);
+actualizarTotales();
+renderizarItems();
+}
+
+function eliminarItem(id) {
+const pin = prompt('Ingrese el PIN de seguridad:');
+if (pin === '1999') {
+items = items.filter(item => item.id !== id);
+actualizarTotales();
+renderizarItems();
+} else {
+alert('PIN incorrecto');
+}
+}
+
+function buscarItem(texto) {
+const resultados = items.filter(item =>
+item.nombre.toLowerCase().includes(texto.toLowerCase())
+);
+renderizarItems(resultados);
+}
+
+function renderizarItems(itemsMostrar = items) {
+const inventario = document.getElementById('inventario');
+inventario.innerHTML = itemsMostrar.map(item => `
+<div class="item">
+<h3>${item.nombre}</h3>
+<p>Costo: $${Number(item.costo).toFixed(2)}</p>
+<p>Precio: $${Number(item.precio).toFixed(2)}</p>
+<p>Fecha: ${item.fecha}</p>
+<button class="btn-vender" onclick="venderItem(${item.id})">Vender</button>
+<button class="btn-eliminar" onclick="eliminarItem(${item.id})">Eliminar</button>
+</div>
+`).join('');
+}
+
+function renderizarHistorial() {
+const tbody = document.querySelector('#historialVentas tbody');
+tbody.innerHTML = vendidos.map(item => `
+<tr>
+<td>${new Date(item.fechaVenta).toLocaleDateString()}</td>
+<td>${item.nombre}</td>
+<td>$${Number(item.costo).toFixed(2)}</td>
+<td>$${Number(item.precio).toFixed(2)}</td>
+<td>$${(Number(item.precio) - Number(item.costo)).toFixed(2)}</td>
+</tr>
+`).join('');
+}
+
+function guardarBackup() {
+const data = { items, vendidos };
+const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = `backup-ventas-${new Date().toISOString().split('T')[0]}.json`;
+a.click();
+}
+
+function cargarBackup(input) {
+const file = input.files[0];
+const reader = new FileReader();
+
+reader.onload = function(e) {
+try {
+const data = JSON.parse(e.target.result);
+items = data.items || [];
+vendidos = data.vendidos || [];
+actualizarTotales();
+renderizarItems();
+alert('Backup cargado correctamente');
+} catch {
+alert('Error al cargar el backup');
+}
+};
+reader.readAsText(file);
+}
+
+// Inicializar
+actualizarTotales();
+renderizarItems();
+renderizarHistorial();
+</script>
+</body>
+</html>
